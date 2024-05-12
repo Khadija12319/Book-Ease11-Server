@@ -8,6 +8,7 @@ const port = process.env.PORT || 5000;
 //middlewares
 app.use(cors())
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wy4ghoc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -39,6 +40,13 @@ async function run() {
         const room=await roomsdata.findOne(query);
         res.send(room);
     })
+
+    app.get('/lthundred', async(req, res) => { 
+        const cursor = roomsdata.find({price: {$lte: 100}});
+        const rooms = await cursor.toArray();
+        console.log(rooms);
+        res.send(rooms);
+    });
     
 
     
