@@ -68,6 +68,35 @@ app.post('/booking', async(req,res)=>{
   const result = await booking.insertOne(newSpot);
   res.send(result); 
 })
+
+app.get('/booking', async(req,res) =>{
+  const cursor=booking.find();
+  const book = await cursor.toArray();
+  res.send(book);
+})
+
+app.put('/rooms/:id',async(req,res)=>{
+  const id=req.params.id;
+  const filter = {_id: new ObjectId(id)};
+  const options = { upsert: true };
+  const updatedstatus =req.body;
+  const spot = {
+      $set: {
+          availability:updatedstatus.availability
+      }
+  }
+  const result = await roomsdata.updateOne(filter,spot,options);
+  res.send(result);
+})
+
+app.get('/bookings',async(req,res)=> {
+  let query={};
+  if(req.query?.email){
+    query={email:req.query.email}
+  }
+  const result= await booking.find(query).toArray();
+  res.send(result);
+})
     
 
     
