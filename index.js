@@ -27,6 +27,7 @@ async function run() {
     await client.connect();
 
     const roomsdata=client.db('Hotel').collection('BookEase');
+    const booking = client.db('Hotel').collection('Booking');
 
     app.get('/rooms', async(req,res) =>{
         const cursor=roomsdata.find();
@@ -47,6 +48,26 @@ async function run() {
         console.log(rooms);
         res.send(rooms);
     });
+
+    app.get('/gthundred', async(req, res) => { 
+      const cursor = roomsdata.find({ price: { $gte: 100, $lte: 200 } });
+      const rooms = await cursor.toArray();
+      console.log(rooms);
+      res.send(rooms);
+  });
+
+  app.get('/twohundred', async(req, res) => { 
+    const cursor = roomsdata.find({ price: { $gte: 200} });
+    const rooms = await cursor.toArray();
+    console.log(rooms);
+    res.send(rooms);
+});
+
+app.post('/booking', async(req,res)=>{
+  const newSpot=req.body;
+  const result = await booking.insertOne(newSpot);
+  res.send(result); 
+})
     
 
     
