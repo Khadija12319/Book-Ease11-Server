@@ -82,22 +82,72 @@ app.put('/rooms/:id',async(req,res)=>{
   const updatedstatus =req.body;
   const spot = {
       $set: {
-          availability:updatedstatus.availability
+          availability:updatedstatus.availability,
+          rating:updatedstatus.rating
       }
   }
   const result = await roomsdata.updateOne(filter,spot,options);
   res.send(result);
 })
 
-app.get('/bookings',async(req,res)=> {
-  let query={};
-  if(req.query?.email){
-    query={email:req.query.email}
-  }
-  const result= await booking.find(query).toArray();
+app.get('/booking/:email', async (req, res) => {
+  const userEmail = req.params.email;
+  const result = await booking.find({ email: userEmail }).toArray();
   res.send(result);
+});
+
+
+app.get('/ratings', async (req, res) => {
+  const cursor = roomsdata.aggregate([
+      {
+          $match: {
+              'rating.rate': { $exists: true, $gte: 0 }
+          }
+      },
+      {
+          $project: {
+              _id: 0,
+              ratings: '$rating'
+          }
+      },
+      {
+        $unwind: '$ratings' // Unwind the ratings array
+      },
+      {
+        $sort: { 'ratings.time': -1 } // Sort ratings in descending order by rate
+      }
+  ]);
+
+  const result = await cursor.toArray();
+  const ratings = result.map(room => room.ratings).flat(); // Extract and flatten ratings from each room
+
+  res.send(ratings);
+});
+
+
+app.put('/booking/:id', async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const options = { upsert: true };
+  const updatedStatus = req.body; // Changed variable name to updatedStatus
+  const bookingUpdate = {
+    $set: {
+      sdate: updatedStatus.sdate,
+      edate: updatedStatus.edate,
+      rating:updatedStatus.rating
+    }
+  };
+  const result = await booking.updateOne(filter, bookingUpdate, options); // Changed variable name to bookingUpdate
+  res.send(result);
+});
+
+
+app.delete('/booking/:id',async(req,res)=>{
+  const id=req.params.id;
+  const query={_id: new ObjectId(id)};
+  const books=await booking.deleteOne(query);
+  res.send(books);
 })
-    
 
     
     await client.db("admin").command({ ping: 1 });
