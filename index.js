@@ -1,14 +1,51 @@
 const express = require("express");
 const cors=require("cors");
+const jwt=require('jsonwebtoken');
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const cookieParser = require("cookie-parser");
 const app=express();
 const port = process.env.PORT || 5000;
 
 //middlewares
-app.use(cors())
+const allowedOrigins = ['http://localhost:5173'];
+app.use(cors({
+  origin: function(origin, callback) {
+    // Check if the origin is allowed or if it's a request from a trusted origin (e.g., not a malicious request)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials:true
+}))
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173'); // Allow requests from this origin
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true'); // Allow credentials (cookies)
+  next();
+});
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+
+
+
+const verifyToken = (req,res,next) =>{
+  const token = req.cookies?.token; 
+  if(!token){
+    return res.status(401).send({message: 'Unauthorizrd access'});
+  }
+  jwt.verify(token,process.env.ACCESS_TOKEN,(err,decoded) =>{
+    if(err){
+      return res.status(401).send({message:'unauthorized access'});
+    }
+    req.user=decoded;
+    next();
+  }) 
+}
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wy4ghoc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -63,19 +100,34 @@ async function run() {
     res.send(rooms);
 });
 
+app.post('/jwt',async(req,res) =>{
+  const user=req.body;
+  const token = jwt.sign(user,process.env.ACCESS_TOKEN,{expiresIn:'20h'});
+  res.cookie('token',token,{
+    httpOnly:true,
+    secure:true,
+    sameSite:'none'
+  }).send({success:true});
+})
+
+app.post('/logout',async(req,res) =>{
+  const user=res.body;
+  res.clearCookie('token',{maxAge:0}).send({success:true});
+})
+
 app.post('/booking', async(req,res)=>{
   const newSpot=req.body;
   const result = await booking.insertOne(newSpot);
   res.send(result); 
 })
 
-app.get('/booking', async(req,res) =>{
+app.get('/booking',verifyToken, async(req,res) =>{
   const cursor=booking.find();
   const book = await cursor.toArray();
   res.send(book);
 })
 
-app.put('/rooms/:id',async(req,res)=>{
+app.put('/rooms/:id',verifyToken,async(req,res)=>{
   const id=req.params.id;
   const filter = {_id: new ObjectId(id)};
   const options = { upsert: true };
@@ -90,7 +142,7 @@ app.put('/rooms/:id',async(req,res)=>{
   res.send(result);
 })
 
-app.get('/booking/:email', async (req, res) => {
+app.get('/booking/:email',verifyToken, async (req, res) => {
   const userEmail = req.params.email;
   const result = await booking.find({ email: userEmail }).toArray();
   res.send(result);
@@ -125,7 +177,7 @@ app.get('/ratings', async (req, res) => {
 });
 
 
-app.put('/booking/:id', async (req, res) => {
+app.put('/booking/:id',verifyToken, async (req, res) => {
   const id = req.params.id;
   const filter = { _id: new ObjectId(id) };
   const options = { upsert: true };
@@ -142,7 +194,7 @@ app.put('/booking/:id', async (req, res) => {
 });
 
 
-app.delete('/booking/:id',async(req,res)=>{
+app.delete('/booking/:id',verifyToken,async(req,res)=>{
   const id=req.params.id;
   const query={_id: new ObjectId(id)};
   const books=await booking.deleteOne(query);
